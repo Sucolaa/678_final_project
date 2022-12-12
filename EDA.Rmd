@@ -1,0 +1,165 @@
+---
+title: "EDA"
+author: "Su Xu"
+date: "2022-12-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Build Environment
+library(backports)     
+library(effects) 
+library(tidyverse) 
+library(interactions)
+library(lme4)
+library(lmerTest)
+library(psych)
+library(plyr) 
+library(usmap)
+```
+
+```{r}
+NE_price <- read.csv("./data/NE_price.csv")
+NE_price %>% 
+  select(-X.2,-X.1,-X) -> NE_price
+summary(NE_price)
+```
+
+# 1. Data Frequency distribution in Geometry
+```{r}
+count(NE_price$state) -> NE_dist
+colnames(NE_dist) <- c("state","freq")
+plot_usmap(regions = "state",
+           include = .northeast_region,
+           data = NE_dist,
+           values = "freq",
+           labels = T,
+           label_color = "white")
+```
+
+```{r}
+ggplot(data = NE_dist,
+       aes(x = reorder(state, -freq),
+           y = freq)) +
+  geom_col(color = "black",
+           fill = "black") +
+  geom_text(aes(label = freq),
+            vjust = -0.4) +
+  labs(title = "House Price Offered in Northeast Region")+
+  xlab("States") +
+  ylab("Account") +
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = -15, vjust = 0.1),
+        plot.title = element_text(hjust = 0.45, size = 16))
+```
+
+```{r}
+summary(NE_price)
+```
+
+```{r}
+NE_price %>% 
+  filter(house_price)
+```
+
+```{r}
+NE_price %>% 
+  ggplot(aes(x = as.factor(bed),
+             y = as.factor(bath))) +
+  geom_point()
+```
+
+```{r}
+ggplot(data = NE_price,
+       aes(x = log(house_price),
+           y = log(house_size))) +
+  geom_point()
+```
+
+```{r}
+count(NE_price$size_level) -> NE_size
+ggplot(NE_size,
+       aes(x = x,
+           y = freq)) +
+  geom_col()
+```
+
+```{r}
+NE_price %>% 
+  ggplot(aes(x = house_size)) +
+  geom_histogram(bins = 100)
+```
+
+```{r}
+ggplot(data = NE_price,
+       aes(x = log(house_size),
+           y = log(house_price))) +
+  geom_point() +
+  stat_smooth(method="lm", fullrange=TRUE)+
+  facet_wrap(~state)
+```
+```{r}
+ggplot(data = NE_price,
+       aes(x = house_size,
+           y = house_price)) +
+  geom_point() +
+  stat_smooth(method="lm", fullrange=TRUE)+
+  facet_wrap(~state)
+```
+
+```{r}
+describe(NE_price)
+```
+
+```{r}
+ggplot(data = NE_price,
+       aes(y = house_size,
+           x = bed)) +
+   geom_point() +
+  geom_smooth()
+```
+
+```{r}
+#simple linear regression
+summary(lm(house_price ~ state +house_size:bed + house_size:bath, data = NE_price))
+```
+
+```{r}
+ggplot(data = NE_price,
+       aes(x = bed,
+           y = house_price)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```{r}
+realtor <- read.csv("./data/realtor-data.csv")
+count(realtor$status)
+```
+```{r}
+NE_price %>% 
+  mutate(size_level = case_when(house_size <= 2500 ~ "<2500",
+                                house_size <= 5000 & house_size >= 2501 ~ "2501-5000",
+                                house_size <= 7500 & house_size >= 5001 ~ "5001-7500",
+                                house_size <= 10000 & house_size >= 7501 ~ "7501-10000")) -> NE_price
+fit1 <- lmer(house_price ~ bed + bath + (1 + bed + bath | size_level) + (1 + bed + bath | state),
+             data = NE_price)
+
+summary(fit1)
+```
+
+```{r}
+NE_price %>% 
+  mutate(bed = as.factor(bed),
+         bath = as.factor(bath)) -> NE_price
+
+fit2 <- lmer(house_price ~ bed + bath + (1 + bed + bath | size_level) + (1 + bed + bath | state),
+             data = NE_price)
+```
+
+```{r}
+num_obs <- round(nrow(NE_price) * 0.2)
+pilot <- sample(NE_price, prob = 0.1)
+```
+

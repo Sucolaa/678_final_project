@@ -1,0 +1,166 @@
+---
+title: "Employee Situation"
+author: "Su Xu"
+date: "2022-12-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Build Environment
+library(backports)     
+library(effects) 
+library(tidyverse) 
+library(interactions)
+library(lme4)
+library(lmerTest)
+library(psych)
+library(plyr) 
+library(usmap)
+```
+
+```{r}
+price <- read.csv("./data/realtor-data.csv")
+#delete useless variables to reduce power used in modeling
+price %>% 
+  select(-full_address, -street, -zip_code, -sold_date) -> price
+drop_na(price) -> price
+price %>% 
+  mutate(house_price = price) %>% 
+  select(-price) -> price
+summary(price)
+```
+
+```{r}
+ggplot(data = price,
+       aes(x = house_price,
+           y = house_size)) +
+  geom_point()
+```
+
+```{r}
+price %>% 
+  filter(house_price >= 800000)
+```
+
+```{r}
+unique(price$state)
+```
+
+```{r}
+count(price$state) -> state_dist
+colnames(state_dist) <- c("state", "freq")
+state_dist %>% 
+  filter(state != "Wyoming") -> state_dist
+plot_usmap(data = state_dist,
+           values = "freq",
+           include = .northeast_region)
+```
+
+```{r}
+price %>% 
+  filter(state != "Wyoming") -> price
+
+price %>% 
+  filter(state == "Massachusetts") -> MA_price
+write.csv(MA_price, "./data/MA_house_price.csv")
+```
+
+```{r}
+MA_price
+```
+
+```{r}
+## Download the file
+
+temp <- tempfile()
+download.file("https://www.unitedstateszipcodes.org/zip-code-database",temp)
+con <- unz(temp, "US.txt")
+US <- read.delim(con, header=FALSE)
+unlink(temp)
+colnames(US)[c(3,5,6)] <- c("city","state","county")
+US %>% 
+  filter(state == "MA") ->US_MA
+US_MA %>% 
+  select(city,county) -> US_MA
+
+US %>% 
+  filter(city == "Pelham")
+
+left_join(MA_price, US_MA, by = "city") -> MA_county
+```
+
+```{r}
+left_join(MA_dist, US_MA, by = "city") %>% 
+  unique() %>% 
+  drop_na() -> MA_county
+
+plot_usmap(regions = "county",
+           include = .northeast_region,
+           data = MA_county,
+           values = "freq")
+```
+
+```{r}
+price %>% 
+  filter(state == "Connecticut") -> CT_price
+price %>% 
+  filter(state == "Maine") -> MI_price
+price %>% 
+  filter(state == "New Hampshire") -> NH_price
+
+full_join(CT_price, MA_price) %>% 
+  full_join(MI_price) %>% 
+  full_join(NH_price)
+```
+
+```{r}
+unique(price$state)
+
+```
+
+Puerto Rico
+Virgin Islands
+West Virginia
+Delaware
+
+```{r}
+price %>% 
+  filter(state != "Puerto Rico") %>% 
+  filter(state != "Virgin Islands") %>% 
+  filter(state != "West Virginia") %>% 
+  filter(state != "Delaware") -> NE_price
+write.csv(NE_price, "./data/NE_price.csv")
+```
+
+```{r}
+NE_price %>% 
+  filter(bed <= 25,
+         bath <= 25) -> NE_price
+NE_price %>% 
+  mutate(house_price = house_price/1000) -> NE_price
+unique(NE_price) %>% 
+  filter(house_price == 10000)
+
+unique(NE_price)[,c("bed","bath","acre_lot","city","state","house_size","house_price")]
+NE_price[!duplicated(NE_price[ , c("bed","bath","acre_lot","city","state","house_size","house_price")]), ] -> NE_price
+
+NE_price %>% 
+  filter(house_price <= 75000,
+         acre_lot <= 2,
+         house_size <= 10000) -> NE_price
+write.csv(NE_price, "./data/NE_price.csv")
+
+NE_price %>% 
+  mutate(size_level = case_when(house_size <= 1000 ~ "<1000",
+                                house_size <= 2000 & house_size >= 1000 ~ "1000-2000",
+                                house_size <= 3000 & house_size >= 2000 ~ "2000-3000",
+                                house_size <= 4000 & house_size >= 3000 ~ "3000-4000",
+                                house_size <= 5000 & house_size >= 4000 ~ "4000-5000",
+                                house_size <= 6000 & house_size >= 5000 ~ "5000-6000",
+                                house_size <= 7000 & house_size >= 6000 ~ "6000-7000",
+                                house_size <= 8000 & house_size >= 7000 ~ "7000-8000",
+                                house_size <= 9000 & house_size >= 8000 ~ "8000-9000",
+                                house_size <= 10000 & house_size >= 9000 ~ "9000-10000",)) -> NE_price
+```
+
